@@ -336,7 +336,10 @@ func (c *Comparisons) WriteComparisons(w io.Writer, prefix string, usePrefix boo
 				diffPathIdx = diffPath[:len(diffPath)-1] + ", strconv.Itoa(i)}"
 			}
 			if usePrefix {
-				diffPath = fmt.Sprintf("append(prefix, %s)", strings.Join(p, ", "))
+				diffPath = "prefix"
+				if len(p) > 0 {
+					diffPath = fmt.Sprintf("append(prefix, %s)", strings.Join(p, ", "))
+				}
 				p = append(p, "strconv.Itoa(i)")
 				diffPathIdx = fmt.Sprintf("append(prefix, %s)", strings.Join(p, ", "))
 			}
