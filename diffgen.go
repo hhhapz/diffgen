@@ -9,7 +9,9 @@ import (
 	"io"
 	"log"
 	"os"
+	"slices"
 	"strings"
+	"unicode"
 
 	"golang.org/x/tools/go/packages"
 )
@@ -20,6 +22,7 @@ var (
 	typeName = flag.String("type", "", "the source type to generate the diff from")
 	skip     = flag.Bool("skip", false, "skip unhandled or unknown types instead of failing")
 	output   = flag.String("output", "", "output file name; default srcdir/<type>_diffgen.go")
+	methods  = flag.Bool("methods", false, "include methods in diff")
 )
 
 func Usage() {
@@ -161,7 +164,18 @@ func ProcessType(prefix []string, t types.Type) [][]string {
 	switch t := t.(type) {
 	case *types.Pointer:
 		elem := t.Elem()
-		return ProcessType(append(prefix, "[pointer]"), elem)
+		items := ProcessType(append(prefix, "[pointer]"), elem)
+		// methods
+		methods := types.NewMethodSet(t)
+		for i := 0; i < methods.Len(); i++ {
+			m := methods.At(i)
+			if !unicode.IsUpper(rune(m.Obj().Name()[0])) {
+				continue
+			}
+			prefix := slices.Clone(prefix)
+			items = append(items, append(prefix, "[method]", m.Obj().Name()))
+		}
+		return items
 	case *types.Named:
 		obj := t.Obj()
 		return ProcessType(prefix, obj.Type().Underlying())
@@ -194,12 +208,17 @@ func ProcessType(prefix []string, t types.Type) [][]string {
 type Comparisons struct {
 	path    []string
 	Fields  []string
+	Methods []string
 	Structs map[string]Comparisons
 }
 
 func (c *Comparisons) Add(path []string) {
 	if len(path) == 1 {
 		c.Fields = append(c.Fields, path[0])
+		return
+	}
+	if len(path) == 2 && path[0] == "[method]" {
+		c.Methods = append(c.Methods, path[1])
 		return
 	}
 	if c.Structs == nil {
@@ -400,6 +419,30 @@ func (c *Comparisons) WriteComparisons(w io.Writer, prefix string, usePrefix boo
 			fmt.Fprintf(w, prefix+"}\n")
 		}
 	}
+	if !*methods || len(c.Methods) == 0 {
+		return
+	}
+	pathB := c.MakePath("b.", (c.path))
+	fmt.Fprintf(w, "%[1]sif %[2]s != nil {\n",
+		prefix, pathB)
+	for _, m := range c.Methods {
+		pathB := c.MakePath("b.", (c.path))
+		p := make([]string, 0, len(c.path)+1)
+		for _, item := range c.path {
+			if item[0] != '[' {
+				p = append(p, "\""+item+"\"")
+			}
+		}
+		p = append(p, "\""+m+"\"")
+		diffPath := "[]string{" + strings.Join(p, ", ") + "}"
+		if usePrefix {
+			diffPath = fmt.Sprintf("append(prefix, %s)", strings.Join(p, ", "))
+		}
+		fmt.Fprintf(w, "%[1]s\tdiff = append(diff, mkDiff(%[4]s, nil, %[3]s))\n",
+			prefix, "", pathB+"."+m, diffPath)
+	}
+	fmt.Fprintf(w, "%[1]s}\n",
+		prefix, pathB)
 }
 
 func (c *Comparisons) MakePath(start string, path []string) string {
