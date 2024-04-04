@@ -73,6 +73,7 @@ func main() {
 	if hasMap {
 		imp = `import (
 	"fmt"
+	"slices"
 	"strconv"
 )`
 	}
@@ -90,7 +91,7 @@ type Diff struct {
 }
 
 func mkDiff(path []string, a, b any) Diff {
-	return Diff{path, a, b}
+	return Diff{slices.Clone(path), a, b}
 }
 
 func Compare%s(a, b %s) (diff []Diff) {
