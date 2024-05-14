@@ -179,6 +179,12 @@ func ProcessType(prefix []string, t types.Type) [][]string {
 		return items
 	case *types.Named:
 		obj := t.Obj()
+		if obj.Pkg() != nil {
+			switch {
+			case obj.Pkg().Name() == "time" && obj.Name() == "Time":
+				return [][]string{prefix}
+			}
+		}
 		return ProcessType(prefix, obj.Type().Underlying())
 	case *types.Struct:
 		return ProcessStruct(prefix, t)
