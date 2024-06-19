@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"unicode"
@@ -127,7 +128,7 @@ func Compare%s(a, b %s) (diff []Diff) {
 	fmt.Fprint(out, "\treturn diff\n}\n")
 	f := os.Stdout
 	if *output == "" {
-		*output = strings.ToLower(*typeName) + "_diffgen.go"
+		*output = filepath.Join(args[0], strings.ToLower(*typeName)+"_diffgen.go")
 	}
 	if *output != "" && *output != "-" {
 		var err error
